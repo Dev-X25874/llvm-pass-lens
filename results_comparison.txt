@@ -1,0 +1,948 @@
+COMPILER PASS ORACLE — RESULTS
+Baseline: 10% | Fine-tuned: 55% | Improvement: +45%
+Dataset: 200 examples (100 safe / 100 interferes)
+============================================================
+
+EXAMPLE 1
+Pass A: tailcallelim
+Pass B: sccp
+IR:
+define void @f(ptr %a, i32 %n) {
+entry:
+  br label %loop
+loop:
+  %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
+  %p = getelementptr inbounds i32, ptr %a, i32 %i
+  %v = load i32, ptr %p, align 4
+  %s = add i32 %v, 1
+  store i32 %s, ptr %p, align 4
+  %i.next = add nsw i32 %i, 1
+  %cmp = icmp slt i32 %i.next, 8
+  br i1 %cmp, label %loop, label %exit
+exit:
+  ret void
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: safe
+GROUND TRUTH: Label: safe
+Explanation: tailcallelim and sccp produce identical output regardless of order (AB == BA).
+------------------------------------------------------------
+
+EXAMPLE 2
+Pass A: jump-threading
+Pass B: instcombine
+IR:
+define i32 @f(i1 %c) {
+entry:
+  %a = alloca i32, align 4
+  br i1 %c, label %t, label %f
+t:
+  store i32 1, ptr %a, align 4
+  br label %merge
+f:
+  store i32 2, ptr %a, align 4
+  br label %merge
+merge:
+  %v = load i32, ptr %a, align 4
+  ret i32 %v
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: interferes
+GROUND TRUTH: Label: interferes
+Explanation: jump-threading and instcombine produce different output depending on order (AB != BA).
+------------------------------------------------------------
+
+EXAMPLE 3
+Pass A: simplifycfg
+Pass B: adce
+IR:
+define void @f(ptr %a) {
+entry:
+  br label %loop
+loop:
+  %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
+  %p = getelementptr inbounds i32, ptr %a, i32 %i
+  store i32 %i, ptr %p, align 4
+  %i.next = add nsw i32 %i, 1
+  %cmp = icmp slt i32 %i.next, 4
+  br i1 %cmp, label %loop, label %exit
+exit:
+  ret void
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: safe
+GROUND TRUTH: Label: safe
+Explanation: simplifycfg and adce produce identical output regardless of order (AB == BA).
+------------------------------------------------------------
+
+EXAMPLE 4
+Pass A: jump-threading
+Pass B: sroa
+IR:
+define i32 @f(i1 %c) {
+entry:
+  %a = alloca { i32, i32 }, align 8
+  %p0 = getelementptr inbounds { i32, i32 }, ptr %a, i32 0, i32 0
+  %p1 = getelementptr inbounds { i32, i32 }, ptr %a, i32 0, i32 1
+  store i32 1, ptr %p0, align 4
+  br i1 %c, label %t, label %f
+t:
+  store i32 2, ptr %p1, align 4
+  br label %merge
+f:
+  store i32 3, ptr %p1, align 4
+  br label %merge
+merge:
+  %x = load i32, ptr %p0, align 4
+  %y = load i32, ptr %p1, align 4
+  %r = add i32 %x, %y
+  ret i32 %r
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: interferes
+GROUND TRUTH: Label: interferes
+Explanation: jump-threading and sroa produce different output depending on order (AB != BA).
+------------------------------------------------------------
+
+EXAMPLE 5
+Pass A: memcpyopt
+Pass B: aggressive-instcombine
+IR:
+define i32 @f(i32 %x) {
+entry:
+  %a = mul i32 %x, 3
+  %b = mul i32 %x, 5
+  %r = add i32 %a, %b
+  ret i32 %r
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: safe
+GROUND TRUTH: Label: safe
+Explanation: memcpyopt and aggressive-instcombine produce identical output regardless of order (AB == BA).
+------------------------------------------------------------
+
+EXAMPLE 6
+Pass A: loop-unroll
+Pass B: gvn
+IR:
+define void @f(ptr %a, i32 %n) {
+entry:
+  br label %loop
+loop:
+  %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
+  %p = getelementptr inbounds i32, ptr %a, i32 %i
+  %v = load i32, ptr %p, align 4
+  %s = add i32 %v, 1
+  store i32 %s, ptr %p, align 4
+  %i.next = add nsw i32 %i, 1
+  %cmp = icmp slt i32 %i.next, 8
+  br i1 %cmp, label %loop, label %exit
+exit:
+  ret void
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: interferes
+GROUND TRUTH: Label: interferes
+Explanation: loop-unroll and gvn produce different output depending on order (AB != BA).
+------------------------------------------------------------
+
+EXAMPLE 7
+Pass A: loop-deletion
+Pass B: loop-rotate
+IR:
+define void @f(ptr %dst, ptr %src, i32 %n) {
+entry:
+  br label %loop
+loop:
+  %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
+  %ps = getelementptr inbounds i32, ptr %src, i32 %i
+  %pd = getelementptr inbounds i32, ptr %dst, i32 %i
+  %v = load i32, ptr %ps, align 4
+  store i32 %v, ptr %pd, align 4
+  %i.next = add nsw i32 %i, 1
+  %cmp = icmp slt i32 %i.next, %n
+  br i1 %cmp, label %loop, label %exit
+exit:
+  ret void
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: safe
+GROUND TRUTH: Label: safe
+Explanation: loop-deletion and loop-rotate produce identical output regardless of order (AB == BA).
+------------------------------------------------------------
+
+EXAMPLE 8
+Pass A: aggressive-instcombine
+Pass B: lcssa
+IR:
+define i32 @f(i32 %x) {
+entry:
+  %a = mul i32 %x, 3
+  %b = mul i32 %x, 5
+  %r = add i32 %a, %b
+  ret i32 %r
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: safe
+GROUND TRUTH: Label: safe
+Explanation: aggressive-instcombine and lcssa produce identical output regardless of order (AB == BA).
+------------------------------------------------------------
+
+EXAMPLE 9
+Pass A: lcssa
+Pass B: loop-simplify
+IR:
+define i32 @f(i32 %n) {
+entry:
+  %a = alloca i32, align 4
+  store i32 0, ptr %a, align 4
+  br label %loop
+loop:
+  %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
+  %v = load i32, ptr %a, align 4
+  %v2 = add i32 %v, 1
+  store i32 %v2, ptr %a, align 4
+  %i.next = add nsw i32 %i, 1
+  %cmp = icmp slt i32 %i.next, %n
+  br i1 %cmp, label %loop, label %exit
+exit:
+  %r = load i32, ptr %a, align 4
+  ret i32 %r
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: safe
+GROUND TRUTH: Label: safe
+Explanation: lcssa and loop-simplify produce identical output regardless of order (AB == BA).
+------------------------------------------------------------
+
+EXAMPLE 10
+Pass A: early-cse
+Pass B: reassociate
+IR:
+define i32 @f(i32 %x, i32 %y) {
+entry:
+  %a = add i32 %x, %y
+  %b = add i32 %x, %y
+  %c = mul i32 %a, 2
+  %d = mul i32 %b, 3
+  %r = add i32 %c, %d
+  ret i32 %r
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: interferes
+GROUND TRUTH: Label: interferes
+Explanation: early-cse and reassociate produce different output depending on order (AB != BA).
+------------------------------------------------------------
+
+EXAMPLE 11
+Pass A: sroa
+Pass B: sccp
+IR:
+define i32 @f(i1 %c) {
+entry:
+  %a = alloca { i32, i32 }, align 8
+  %p0 = getelementptr inbounds { i32, i32 }, ptr %a, i32 0, i32 0
+  %p1 = getelementptr inbounds { i32, i32 }, ptr %a, i32 0, i32 1
+  store i32 1, ptr %p0, align 4
+  br i1 %c, label %t, label %f
+t:
+  store i32 2, ptr %p1, align 4
+  br label %merge
+f:
+  store i32 3, ptr %p1, align 4
+  br label %merge
+merge:
+  %x = load i32, ptr %p0, align 4
+  %y = load i32, ptr %p1, align 4
+  %r = add i32 %x, %y
+  ret i32 %r
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: interferes
+GROUND TRUTH: Label: interferes
+Explanation: sroa and sccp produce different output depending on order (AB != BA).
+------------------------------------------------------------
+
+EXAMPLE 12
+Pass A: loop-unroll
+Pass B: instcombine
+IR:
+define i32 @f(ptr %p) {
+entry:
+  %a = alloca i32, align 4
+  store i32 5, ptr %a, align 4
+  %v = load i32, ptr %a, align 4
+  %r = add i32 %v, %v
+  ret i32 %r
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: safe
+GROUND TRUTH: Label: safe
+Explanation: loop-unroll and instcombine produce identical output regardless of order (AB == BA).
+------------------------------------------------------------
+
+EXAMPLE 13
+Pass A: sroa
+Pass B: instcombine
+IR:
+define i32 @f(i1 %c) {
+entry:
+  %a = alloca { i32, i32 }, align 8
+  %p0 = getelementptr inbounds { i32, i32 }, ptr %a, i32 0, i32 0
+  %p1 = getelementptr inbounds { i32, i32 }, ptr %a, i32 0, i32 1
+  store i32 1, ptr %p0, align 4
+  br i1 %c, label %t, label %f
+t:
+  store i32 2, ptr %p1, align 4
+  br label %merge
+f:
+  store i32 3, ptr %p1, align 4
+  br label %merge
+merge:
+  %x = load i32, ptr %p0, align 4
+  %y = load i32, ptr %p1, align 4
+  %r = add i32 %x, %y
+  ret i32 %r
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: interferes
+GROUND TRUTH: Label: interferes
+Explanation: sroa and instcombine produce different output depending on order (AB != BA).
+------------------------------------------------------------
+
+EXAMPLE 14
+Pass A: mem2reg
+Pass B: reassociate
+IR:
+define i32 @f(ptr %p) {
+entry:
+  %a = alloca i32, align 4
+  store i32 5, ptr %a, align 4
+  %v = load i32, ptr %a, align 4
+  %r = add i32 %v, %v
+  ret i32 %r
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: interferes
+GROUND TRUTH: Label: interferes
+Explanation: mem2reg and reassociate produce different output depending on order (AB != BA).
+------------------------------------------------------------
+
+EXAMPLE 15
+Pass A: reassociate
+Pass B: early-cse
+IR:
+define i32 @f(i32 %x, i32 %y) {
+entry:
+  %a = add i32 %x, %y
+  %b = add i32 %x, %y
+  %c = mul i32 %a, 2
+  %d = mul i32 %b, 3
+  %r = add i32 %c, %d
+  ret i32 %r
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: interferes
+GROUND TRUTH: Label: interferes
+Explanation: reassociate and early-cse produce different output depending on order (AB != BA).
+------------------------------------------------------------
+
+EXAMPLE 16
+Pass A: loop-unroll
+Pass B: simplifycfg
+IR:
+define i32 @f(ptr %p) {
+entry:
+  %a = alloca i32, align 4
+  store i32 5, ptr %a, align 4
+  %v = load i32, ptr %a, align 4
+  %r = add i32 %v, %v
+  ret i32 %r
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: safe
+GROUND TRUTH: Label: safe
+Explanation: loop-unroll and simplifycfg produce identical output regardless of order (AB == BA).
+------------------------------------------------------------
+
+EXAMPLE 17
+Pass A: sroa
+Pass B: gvn
+IR:
+define i32 @f(i32 %n) {
+entry:
+  %a = alloca i32, align 4
+  store i32 0, ptr %a, align 4
+  br label %loop
+loop:
+  %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
+  %v = load i32, ptr %a, align 4
+  %v2 = add i32 %v, 1
+  store i32 %v2, ptr %a, align 4
+  %i.next = add nsw i32 %i, 1
+  %cmp = icmp slt i32 %i.next, %n
+  br i1 %cmp, label %loop, label %exit
+exit:
+  %r = load i32, ptr %a, align 4
+  ret i32 %r
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: interferes
+GROUND TRUTH: Label: interferes
+Explanation: sroa and gvn produce different output depending on order (AB != BA).
+------------------------------------------------------------
+
+EXAMPLE 18
+Pass A: early-cse
+Pass B: lcssa
+IR:
+define i32 @f(i32 %n) {
+entry:
+  %a = alloca i32, align 4
+  store i32 0, ptr %a, align 4
+  br label %loop
+loop:
+  %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
+  %v = load i32, ptr %a, align 4
+  %v2 = add i32 %v, 1
+  store i32 %v2, ptr %a, align 4
+  %i.next = add nsw i32 %i, 1
+  %cmp = icmp slt i32 %i.next, %n
+  br i1 %cmp, label %loop, label %exit
+exit:
+  %r = load i32, ptr %a, align 4
+  ret i32 %r
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: interferes
+GROUND TRUTH: Label: interferes
+Explanation: early-cse and lcssa produce different output depending on order (AB != BA).
+------------------------------------------------------------
+
+EXAMPLE 19
+Pass A: gvn
+Pass B: sroa
+IR:
+define i32 @f(i1 %c) {
+entry:
+  %a = alloca i32, align 4
+  br i1 %c, label %t, label %f
+t:
+  store i32 1, ptr %a, align 4
+  br label %merge
+f:
+  store i32 2, ptr %a, align 4
+  br label %merge
+merge:
+  %v = load i32, ptr %a, align 4
+  ret i32 %v
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: interferes
+GROUND TRUTH: Label: interferes
+Explanation: gvn and sroa produce different output depending on order (AB != BA).
+------------------------------------------------------------
+
+EXAMPLE 20
+Pass A: instcombine
+Pass B: jump-threading
+IR:
+define i32 @f(i1 %c) {
+entry:
+  %a = alloca i32, align 4
+  br i1 %c, label %t, label %f
+t:
+  store i32 1, ptr %a, align 4
+  br label %merge
+f:
+  store i32 2, ptr %a, align 4
+  br label %merge
+merge:
+  %v = load i32, ptr %a, align 4
+  ret i32 %v
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: interferes
+GROUND TRUTH: Label: interferes
+Explanation: instcombine and jump-threading produce different output depending on order (AB != BA).
+------------------------------------------------------------
+
+EXAMPLE 21
+Pass A: sccp
+Pass B: dce
+IR:
+define i32 @f(i1 %c) {
+entry:
+  %a = alloca i32, align 4
+  store i32 42, ptr %a, align 4
+  %v = load i32, ptr %a, align 4
+  ret i32 %v
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: safe
+GROUND TRUTH: Label: safe
+Explanation: sccp and dce produce identical output regardless of order (AB == BA).
+------------------------------------------------------------
+
+EXAMPLE 22
+Pass A: gvn
+Pass B: instcombine
+IR:
+define i32 @f(i32 %x) {
+entry:
+  br i1 true, label %t, label %f
+t:
+  ret i32 %x
+f:
+  ret i32 0
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: safe
+GROUND TRUTH: Label: safe
+Explanation: gvn and instcombine produce identical output regardless of order (AB == BA).
+------------------------------------------------------------
+
+EXAMPLE 23
+Pass A: sccp
+Pass B: instcombine
+IR:
+define i32 @f(i32 %x) {
+entry:
+  %dead1 = mul i32 %x, 7
+  %dead2 = add i32 %dead1, 3
+  %dead3 = sub i32 %dead2, 1
+  ret i32 %x
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: safe
+GROUND TRUTH: Label: safe
+Explanation: sccp and instcombine produce identical output regardless of order (AB == BA).
+------------------------------------------------------------
+
+EXAMPLE 24
+Pass A: gvn
+Pass B: early-cse
+IR:
+define i32 @f(i1 %c) {
+entry:
+  %a = alloca i32, align 4
+  store i32 42, ptr %a, align 4
+  %v = load i32, ptr %a, align 4
+  ret i32 %v
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: safe
+GROUND TRUTH: Label: safe
+Explanation: gvn and early-cse produce identical output regardless of order (AB == BA).
+------------------------------------------------------------
+
+EXAMPLE 25
+Pass A: instcombine
+Pass B: reassociate
+IR:
+define i32 @f(i32 %n) {
+entry:
+  %a = alloca i32, align 4
+  store i32 0, ptr %a, align 4
+  br label %loop
+loop:
+  %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
+  %v = load i32, ptr %a, align 4
+  %v2 = add i32 %v, 1
+  store i32 %v2, ptr %a, align 4
+  %i.next = add nsw i32 %i, 1
+  %cmp = icmp slt i32 %i.next, %n
+  br i1 %cmp, label %loop, label %exit
+exit:
+  %r = load i32, ptr %a, align 4
+  ret i32 %r
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: safe
+GROUND TRUTH: Label: safe
+Explanation: instcombine and reassociate produce identical output regardless of order (AB == BA).
+------------------------------------------------------------
+
+EXAMPLE 26
+Pass A: lcssa
+Pass B: mem2reg
+IR:
+define i32 @f(i32 %n) {
+entry:
+  %a = alloca i32, align 4
+  store i32 0, ptr %a, align 4
+  br label %loop
+loop:
+  %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
+  %v = load i32, ptr %a, align 4
+  %v2 = add i32 %v, 1
+  store i32 %v2, ptr %a, align 4
+  %i.next = add nsw i32 %i, 1
+  %cmp = icmp slt i32 %i.next, %n
+  br i1 %cmp, label %loop, label %exit
+exit:
+  %r = load i32, ptr %a, align 4
+  ret i32 %r
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: interferes
+GROUND TRUTH: Label: interferes
+Explanation: lcssa and mem2reg produce different output depending on order (AB != BA).
+------------------------------------------------------------
+
+EXAMPLE 27
+Pass A: instcombine
+Pass B: loop-unroll
+IR:
+define i32 @f(ptr %a, ptr %b, i32 %n) {
+entry:
+  br label %loop
+loop:
+  %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
+  %inv = load i32, ptr %b, align 4
+  %p = getelementptr inbounds i32, ptr %a, i32 %i
+  %v = load i32, ptr %p, align 4
+  %s = add i32 %v, %inv
+  store i32 %s, ptr %p, align 4
+  %i.next = add nsw i32 %i, 1
+  %cmp = icmp slt i32 %i.next, %n
+  br i1 %cmp, label %loop, label %exit
+exit:
+  ret i32 %inv
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: interferes
+GROUND TRUTH: Label: interferes
+Explanation: instcombine and loop-unroll produce different output depending on order (AB != BA).
+------------------------------------------------------------
+
+EXAMPLE 28
+Pass A: memcpyopt
+Pass B: early-cse
+IR:
+define i32 @f(i32 %x) {
+entry:
+  %a = add i32 %x, 0
+  %b = mul i32 %a, 1
+  %c = sub i32 %b, 0
+  ret i32 %c
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: safe
+GROUND TRUTH: Label: safe
+Explanation: memcpyopt and early-cse produce identical output regardless of order (AB == BA).
+------------------------------------------------------------
+
+EXAMPLE 29
+Pass A: simplifycfg
+Pass B: loop-unroll
+IR:
+define void @f(ptr %a, i32 %n) {
+entry:
+  br label %loop
+loop:
+  %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
+  %p = getelementptr inbounds i32, ptr %a, i32 %i
+  %v = load i32, ptr %p, align 4
+  %s = add i32 %v, 1
+  store i32 %s, ptr %p, align 4
+  %i.next = add nsw i32 %i, 1
+  %cmp = icmp slt i32 %i.next, 8
+  br i1 %cmp, label %loop, label %exit
+exit:
+  ret void
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: interferes
+GROUND TRUTH: Label: interferes
+Explanation: simplifycfg and loop-unroll produce different output depending on order (AB != BA).
+------------------------------------------------------------
+
+EXAMPLE 30
+Pass A: lcssa
+Pass B: gvn
+IR:
+define i32 @f(ptr %a, ptr %b, i32 %n) {
+entry:
+  br label %loop
+loop:
+  %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
+  %inv = load i32, ptr %b, align 4
+  %p = getelementptr inbounds i32, ptr %a, i32 %i
+  %v = load i32, ptr %p, align 4
+  %s = add i32 %v, %inv
+  store i32 %s, ptr %p, align 4
+  %i.next = add nsw i32 %i, 1
+  %cmp = icmp slt i32 %i.next, %n
+  br i1 %cmp, label %loop, label %exit
+exit:
+  ret i32 %inv
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: interferes
+GROUND TRUTH: Label: interferes
+Explanation: lcssa and gvn produce different output depending on order (AB != BA).
+------------------------------------------------------------
+
+EXAMPLE 31
+Pass A: dce
+Pass B: early-cse
+IR:
+define i32 @f(ptr %p) {
+entry:
+  %a = alloca i32, align 4
+  store i32 5, ptr %a, align 4
+  %v = load i32, ptr %a, align 4
+  %r = add i32 %v, %v
+  ret i32 %r
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: safe
+GROUND TRUTH: Label: safe
+Explanation: dce and early-cse produce identical output regardless of order (AB == BA).
+------------------------------------------------------------
+
+EXAMPLE 32
+Pass A: mem2reg
+Pass B: simplifycfg
+IR:
+define i32 @f(i1 %c) {
+entry:
+  %a = alloca i32, align 4
+  br i1 %c, label %t, label %f
+t:
+  store i32 1, ptr %a, align 4
+  br label %merge
+f:
+  store i32 2, ptr %a, align 4
+  br label %merge
+merge:
+  %v = load i32, ptr %a, align 4
+  ret i32 %v
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: interferes
+GROUND TRUTH: Label: interferes
+Explanation: mem2reg and simplifycfg produce different output depending on order (AB != BA).
+------------------------------------------------------------
+
+EXAMPLE 33
+Pass A: instcombine
+Pass B: jump-threading
+IR:
+define i32 @f(i1 %c) {
+entry:
+  %a = alloca i32, align 4
+  store i32 42, ptr %a, align 4
+  %v = load i32, ptr %a, align 4
+  ret i32 %v
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: safe
+GROUND TRUTH: Label: safe
+Explanation: instcombine and jump-threading produce identical output regardless of order (AB == BA).
+------------------------------------------------------------
+
+EXAMPLE 34
+Pass A: gvn
+Pass B: tailcallelim
+IR:
+define i32 @f(i32 %x) {
+entry:
+  br i1 true, label %t, label %f
+t:
+  ret i32 %x
+f:
+  ret i32 0
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: safe
+GROUND TRUTH: Label: safe
+Explanation: gvn and tailcallelim produce identical output regardless of order (AB == BA).
+------------------------------------------------------------
+
+EXAMPLE 35
+Pass A: jump-threading
+Pass B: mem2reg
+IR:
+define i32 @f(i1 %c) {
+entry:
+  %a = alloca { i32, i32 }, align 8
+  %p0 = getelementptr inbounds { i32, i32 }, ptr %a, i32 0, i32 0
+  %p1 = getelementptr inbounds { i32, i32 }, ptr %a, i32 0, i32 1
+  store i32 1, ptr %p0, align 4
+  br i1 %c, label %t, label %f
+t:
+  store i32 2, ptr %p1, align 4
+  br label %merge
+f:
+  store i32 3, ptr %p1, align 4
+  br label %merge
+merge:
+  %x = load i32, ptr %p0, align 4
+  %y = load i32, ptr %p1, align 4
+  %r = add i32 %x, %y
+  ret i32 %r
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: safe
+GROUND TRUTH: Label: safe
+Explanation: jump-threading and mem2reg produce identical output regardless of order (AB == BA).
+------------------------------------------------------------
+
+EXAMPLE 36
+Pass A: gvn
+Pass B: tailcallelim
+IR:
+define i32 @f(i1 %c) {
+entry:
+  %a = alloca i32, align 4
+  br i1 %c, label %t, label %f
+t:
+  store i32 1, ptr %a, align 4
+  br label %merge
+f:
+  store i32 2, ptr %a, align 4
+  br label %merge
+merge:
+  %v = load i32, ptr %a, align 4
+  ret i32 %v
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: safe
+GROUND TRUTH: Label: safe
+Explanation: gvn and tailcallelim produce identical output regardless of order (AB == BA).
+------------------------------------------------------------
+
+EXAMPLE 37
+Pass A: reassociate
+Pass B: instcombine
+IR:
+define i32 @f(i1 %c) {
+entry:
+  %a = alloca { i32, i32 }, align 8
+  %p0 = getelementptr inbounds { i32, i32 }, ptr %a, i32 0, i32 0
+  %p1 = getelementptr inbounds { i32, i32 }, ptr %a, i32 0, i32 1
+  store i32 1, ptr %p0, align 4
+  br i1 %c, label %t, label %f
+t:
+  store i32 2, ptr %p1, align 4
+  br label %merge
+f:
+  store i32 3, ptr %p1, align 4
+  br label %merge
+merge:
+  %x = load i32, ptr %p0, align 4
+  %y = load i32, ptr %p1, align 4
+  %r = add i32 %x, %y
+  ret i32 %r
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: interferes
+GROUND TRUTH: Label: interferes
+Explanation: reassociate and instcombine produce different output depending on order (AB != BA).
+------------------------------------------------------------
+
+EXAMPLE 38
+Pass A: adce
+Pass B: jump-threading
+IR:
+define i32 @f(i32 %x, i32 %y) {
+entry:
+  %a = add i32 %x, %y
+  %b = add i32 %x, %y
+  %c = mul i32 %a, 2
+  %d = mul i32 %b, 3
+  %r = add i32 %c, %d
+  ret i32 %r
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: safe
+GROUND TRUTH: Label: safe
+Explanation: adce and jump-threading produce identical output regardless of order (AB == BA).
+------------------------------------------------------------
+
+EXAMPLE 39
+Pass A: memcpyopt
+Pass B: dce
+IR:
+define i32 @f(i32 %x) {
+entry:
+  br i1 true, label %t, label %f
+t:
+  ret i32 %x
+f:
+  ret i32 0
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: safe
+GROUND TRUTH: Label: safe
+Explanation: memcpyopt and dce produce identical output regardless of order (AB == BA).
+------------------------------------------------------------
+
+EXAMPLE 40
+Pass A: gvn
+Pass B: loop-unroll
+IR:
+define i32 @f(ptr %a, ptr %b, i32 %n) {
+entry:
+  br label %loop
+loop:
+  %i = phi i32 [ 0, %entry ], [ %i.next, %loop ]
+  %inv = load i32, ptr %b, align 4
+  %p = getelementptr inbounds i32, ptr %a, i32 %i
+  %v = load i32, ptr %p, align 4
+  %s = add i32 %v, %inv
+  store i32 %s, ptr %p, align 4
+  %i.next = add nsw i32 %i, 1
+  %cmp = icmp slt i32 %i.next, %n
+  br i1 %cmp, label %loop, label %exit
+exit:
+  ret i32 %inv
+}
+
+BASELINE:    Label: safe  (always guesses safe)
+FINE-TUNED:  Label: interferes
+GROUND TRUTH: Label: interferes
+Explanation: gvn and loop-unroll produce different output depending on order (AB != BA).
+------------------------------------------------------------
+
