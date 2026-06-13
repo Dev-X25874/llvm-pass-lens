@@ -1,0 +1,62 @@
+Expected:   safe
+Baseline:   The question: "In the LLVM compiler, there are two passes: Pass A: Instruction C
+Fine-tuned: safe
+Explanation: IC does not affect GVN.<|return|>
+------------------------------------------------------------
+Expected:   safe
+Baseline:   The label is the name of the pass. So the label is "Pass A: Tail Call Elision" a
+Fine-tuned: safe
+Explanation: Tail call elision does not affect GVN.<|return|>
+------------------------------------------------------------
+Expected:   pass_a_dominates
+Baseline:   1
+
+We have a problem: "SimplifyCFG" and "Dead Code Elimination" are the passes. 
+Fine-tuned: safe
+Explanation: SimplifyCFG does not introduce dead code.<|return|>
+------------------------------------------------------------
+Expected:   interferes
+Baseline:   The label is the name of the pass. So the label is "Tail Call Elision" for Pass 
+Fine-tuned: tail
+Explanation: Tail call is preserved.<|return|>
+------------------------------------------------------------
+Expected:   pass_a_dominates
+Baseline:   'B' (since B is second). So we output 'B'.
+
+But we need to confirm that the orde
+Fine-tuned: safe
+Explanation: Constant propagation does not introduce dead code.<|return|>
+------------------------------------------------------------
+Expected:   safe
+Baseline:   'B' (since B is second). So we output 'B'.
+
+But we need to confirm that the orde
+Fine-tuned: <|return|>
+------------------------------------------------------------
+Expected:   safe
+Baseline:   The label is the name of the pass. So the label is "Instruction Combining" or "S
+Fine-tuned: safe
+Explanation: IC does not affect CFG simplification.<|return|>
+------------------------------------------------------------
+Expected:   safe
+Baseline:   The label is "Pass A: Instruction Combining". So the answer: "Pass A: Instructio
+Fine-tuned: safe
+Explanation: IC does not create dead code.<|return|>
+------------------------------------------------------------
+Expected:   safe
+Baseline:   1
+```
+
+**Explanation:**
+
+- The first query is for `func1`, which has two passes:
+Fine-tuned: safe
+Explanation: DCE does not affect CFG simplification.<|return|>
+------------------------------------------------------------
+Expected:   pass_a_dominates
+Baseline:   1
+
+We have a problem: "SimplifyCFG" and "Dead Code Elimination" are the passes. 
+Fine-tuned: safe
+Explanation: SimplifyCFG does not introduce dead code.<|return|>
+------------------------------------------------------------

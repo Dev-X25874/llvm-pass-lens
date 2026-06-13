@@ -1,0 +1,73 @@
+DATASET VERIFICATION REPORT
+============================================================
+
+Example 1
+Pass A:      GVN
+Pass B:      LoopSimplify
+IR:          define void @loop(i32 %n) {\nentry:\n  %i = phi i32 [0, %entry], [%inc, %loop]\n  %t1 = add i32 %i, 
+Label:       interferes
+Explanation: GVN may remove the duplicate adds, altering the loop body that LoopSimplify expects for canonicalization.
+------------------------------------------------------------
+Example 2
+Pass A:      Inline
+Pass B:      LoopSimplify
+IR:          define void @caller(i32* %p) {\nentry:\n  call void @callee(i32* %p)\n  ret void\n}\n\ndefine void @
+Label:       pass_a_dominates
+Explanation: Inlining first expands the loop into the caller, after which LoopSimplify can normalize the combined loop.
+------------------------------------------------------------
+Example 3
+Pass A:      GVN
+Pass B:      Inline
+IR:          define i32 @caller(i32 %x) {\nentry:\n  %y = call i32 @callee(i32 %x)\n  ret i32 %y\n}\n\ndefine i32
+Label:       pass_b_dominates
+Explanation: Inlining first would duplicate the adds, making GVN's job harder; GVN should run before Inline.
+------------------------------------------------------------
+Example 4
+Pass A:      Mem2Reg
+Pass B:      GVN
+IR:          define i32 @func(i32 %x) {\nentry:\n  %a = alloca i32\n  store i32 %x, i32* %a\n  %b = load i32, i32
+Label:       pass_a_dominates
+Explanation: Mem2Reg promotes the stack variable, enabling GVN to eliminate the duplicate adds.
+------------------------------------------------------------
+Example 5
+Pass A:      GVN
+Pass B:      DeadCodeElimination
+IR:          define i32 @foo(i32 %x) {\nentry:\n  %a = add i32 %x, 0\n  %b = add i32 %x, 0\n  %c = add i32 %a, %b
+Label:       pass_a_dominates
+Explanation: GVN eliminates the duplicate adds, after which DCE can remove any dead temporaries.
+------------------------------------------------------------
+Example 6
+Pass A:      GVN
+Pass B:      DeadCodeElimination
+IR:          define i32 @g(i32 %a) {\nentry:\n  %b = add i32 %a, 0\n  %c = add i32 %a, 0\n  %d = add i32 %b, %c\n
+Label:       pass_a_dominates
+Explanation: GVN eliminates the redundant %c, after which DeadCodeElimination can remove the now dead %b.
+------------------------------------------------------------
+Example 7
+Pass A:      LoopSimplify
+Pass B:      DeadCodeElimination
+IR:          define void @loop(i32 %n) {\nentry:\n  %i = alloca i32\n  store i32 0, i32* %i\n  br label %header\n
+Label:       safe
+Explanation: Simplifying the loop does not introduce dead code; DCE can still run safely afterwards.
+------------------------------------------------------------
+Example 8
+Pass A:      Mem2Reg
+Pass B:      Inline
+IR:          define i32 @caller() {\nentry:\n  %a = alloca i32\n  store i32 42, i32* %a\n  %v = load i32, i32* %a
+Label:       pass_b_dominates
+Explanation: Inlining @callee before Mem2Reg would keep the alloca live; Mem2Reg should run first to promote the stack slot.
+------------------------------------------------------------
+Example 9
+Pass A:      GVN
+Pass B:      Inline
+IR:          define i32 @caller(i32 %x) {\nentry:\n  %y = call i32 @callee(i32 %x)\n  ret i32 %y\n}\n\ndefine i32
+Label:       pass_b_dominates
+Explanation: Inlining before GVN would duplicate the redundant adds; running GVN first reduces redundancy before inlining.
+------------------------------------------------------------
+Example 10
+Pass A:      LoopRotate
+Pass B:      LoopSimplify
+IR:          define void @loop(i32 %n) {\nentry:\n  br label %header\nheader:\n  %i = phi i32 [0, %entry], [%next
+Label:       safe
+Explanation: Both passes operate on loop structure and can be applied in any order without breaking correctness.
+------------------------------------------------------------
