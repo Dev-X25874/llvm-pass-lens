@@ -1,4 +1,3 @@
-cat > README.md << 'ENDOFFILE'
 # llvm-pass-lens
 
 Fine-tuning a 120B LLM to classify LLVM compiler pass interactions using real `opt`-verified ground truth.
@@ -33,32 +32,26 @@ Every label is derived by actually running `opt` twice and comparing normalized 
 
 ## Setup
 
-```bash
 pip install -r requirements.txt
 export TINKER_API_KEY="your_key_here"
-```
 
-LLVM 18+ must be installed (`/usr/bin/opt`).
+LLVM 18+ must be installed (/usr/bin/opt).
 
 ---
 
 ## Generate dataset
 
-```bash
 python3 ground_truth_gen.py --count 200
-```
 
-Generates 100 safe + 100 interferes examples verified by `opt`.
+Generates 100 safe + 100 interferes examples verified by opt.
 
 ---
 
 ## Train
 
-```bash
 python3 trainfixed.py
-```
 
-Trains `openai/gpt-oss-120b` with LoRA rank 16 for 5 epochs. Prints baseline vs fine-tuned accuracy at the end.
+Trains openai/gpt-oss-120b with LoRA rank 16 for 5 epochs. Prints baseline vs fine-tuned accuracy at the end.
 
 ---
 
@@ -72,5 +65,4 @@ Trains `openai/gpt-oss-120b` with LoRA rank 16 for 5 epochs. Prints baseline vs 
 
 ---
 
-*Built in GitHub Codespaces. LLVM 18.1.3. TML Tinker SDK 0.22.3.*
-ENDOFFILE
+Built in GitHub Codespaces. LLVM 18.1.3. TML Tinker SDK 0.22.3.
