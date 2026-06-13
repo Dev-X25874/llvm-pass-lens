@@ -1,0 +1,201 @@
+Synchronous method 'ServiceClient.create_lora_training_client()' called from async context. Use 'ServiceClient.create_lora_training_client_async()' instead.
+Calling sync methods from async code can cause deadlocks and performance issues.
+===== Stack for calling sync from async ===== 
+['  File "/workspaces/compiler-pass-oracle/trainfixed.py", line 188, in <module>\n    asyncio.run(train())\n', '  File "/home/codespace/.python/current/lib/python3.12/asyncio/runners.py", line 194, in run\n    return runner.run(main)\n', '  File "/home/codespace/.python/current/lib/python3.12/asyncio/runners.py", line 118, in run\n    return self._loop.run_until_complete(task)\n', '  File "/home/codespace/.python/current/lib/python3.12/asyncio/base_events.py", line 671, in run_until_complete\n    self.run_forever()\n', '  File "/home/codespace/.python/current/lib/python3.12/asyncio/base_events.py", line 638, in run_forever\n    self._run_once()\n', '  File "/home/codespace/.python/current/lib/python3.12/asyncio/base_events.py", line 1971, in _run_once\n    handle._run()\n', '  File "/home/codespace/.python/current/lib/python3.12/asyncio/events.py", line 84, in _run\n    self._context.run(self._callback, *self._args)\n', '  File "/workspaces/compiler-pass-oracle/trainfixed.py", line 129, in train\n    training_client = service_client.create_lora_training_client(\n', '  File "/home/codespace/.local/lib/python3.12/site-packages/tinker/lib/sync_only.py", line 72, in wrapper\n    f"===== Stack for calling sync from async ===== \\n{traceback.format_stack()}\\n ==========="\n']
+ ===========
+[transformers] PyTorch was not found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Dataset: 280 total | 224 train | 56 test
+Creating LoRA training client — openai/gpt-oss-120b, rank=16
+Tokenizer ready.
+
+==================================================
+BASELINE EVAL
+==================================================
+Running Baseline eval on 56 examples (16 parallel)...
+Baseline Accuracy: 3/56 = 5.4%
+  interferes             0/21 = 0.0%
+  safe                   3/35 = 8.6%
+
+Tokenizing training data...
+
+==================================================
+TRAINING: 5 epochs | batch=8 | 140 steps
+==================================================
+Epoch 1/5 | Step 1/140
+Epoch 1/5 | Step 2/140
+Epoch 1/5 | Step 3/140
+Epoch 1/5 | Step 4/140
+Epoch 1/5 | Step 5/140
+Epoch 1/5 | Step 6/140
+Epoch 1/5 | Step 7/140
+Epoch 1/5 | Step 8/140
+Epoch 1/5 | Step 9/140
+Epoch 1/5 | Step 10/140
+  Saved: checkpoint-step-10
+Epoch 1/5 | Step 11/140
+Epoch 1/5 | Step 12/140
+Epoch 1/5 | Step 13/140
+Epoch 1/5 | Step 14/140
+Epoch 1/5 | Step 15/140
+Epoch 1/5 | Step 16/140
+Epoch 1/5 | Step 17/140
+Epoch 1/5 | Step 18/140
+Epoch 1/5 | Step 19/140
+Epoch 1/5 | Step 20/140
+  Saved: checkpoint-step-20
+Epoch 1/5 | Step 21/140
+Epoch 1/5 | Step 22/140
+Epoch 1/5 | Step 23/140
+Epoch 1/5 | Step 24/140
+Epoch 1/5 | Step 25/140
+Epoch 1/5 | Step 26/140
+Epoch 1/5 | Step 27/140
+Epoch 1/5 | Step 28/140
+Epoch 1 complete.
+Epoch 2/5 | Step 29/140
+Epoch 2/5 | Step 30/140
+  Saved: checkpoint-step-30
+Epoch 2/5 | Step 31/140
+Epoch 2/5 | Step 32/140
+Epoch 2/5 | Step 33/140
+Epoch 2/5 | Step 34/140
+Epoch 2/5 | Step 35/140
+Epoch 2/5 | Step 36/140
+Epoch 2/5 | Step 37/140
+Epoch 2/5 | Step 38/140
+Epoch 2/5 | Step 39/140
+Epoch 2/5 | Step 40/140
+  Saved: checkpoint-step-40
+Epoch 2/5 | Step 41/140
+Epoch 2/5 | Step 42/140
+Epoch 2/5 | Step 43/140
+Epoch 2/5 | Step 44/140
+Epoch 2/5 | Step 45/140
+Epoch 2/5 | Step 46/140
+Epoch 2/5 | Step 47/140
+Epoch 2/5 | Step 48/140
+Epoch 2/5 | Step 49/140
+Epoch 2/5 | Step 50/140
+  Saved: checkpoint-step-50
+Epoch 2/5 | Step 51/140
+Epoch 2/5 | Step 52/140
+Epoch 2/5 | Step 53/140
+Epoch 2/5 | Step 54/140
+Epoch 2/5 | Step 55/140
+Epoch 2/5 | Step 56/140
+Epoch 2 complete.
+Epoch 3/5 | Step 57/140
+Epoch 3/5 | Step 58/140
+Epoch 3/5 | Step 59/140
+Epoch 3/5 | Step 60/140
+  Saved: checkpoint-step-60
+Epoch 3/5 | Step 61/140
+Epoch 3/5 | Step 62/140
+Epoch 3/5 | Step 63/140
+Epoch 3/5 | Step 64/140
+Epoch 3/5 | Step 65/140
+Epoch 3/5 | Step 66/140
+Epoch 3/5 | Step 67/140
+Epoch 3/5 | Step 68/140
+Epoch 3/5 | Step 69/140
+Epoch 3/5 | Step 70/140
+  Saved: checkpoint-step-70
+Epoch 3/5 | Step 71/140
+Epoch 3/5 | Step 72/140
+Epoch 3/5 | Step 73/140
+Epoch 3/5 | Step 74/140
+Epoch 3/5 | Step 75/140
+Epoch 3/5 | Step 76/140
+Epoch 3/5 | Step 77/140
+Epoch 3/5 | Step 78/140
+Epoch 3/5 | Step 79/140
+Epoch 3/5 | Step 80/140
+  Saved: checkpoint-step-80
+Epoch 3/5 | Step 81/140
+Epoch 3/5 | Step 82/140
+Epoch 3/5 | Step 83/140
+Epoch 3/5 | Step 84/140
+Epoch 3 complete.
+Epoch 4/5 | Step 85/140
+Epoch 4/5 | Step 86/140
+Epoch 4/5 | Step 87/140
+Epoch 4/5 | Step 88/140
+Epoch 4/5 | Step 89/140
+Epoch 4/5 | Step 90/140
+  Saved: checkpoint-step-90
+Epoch 4/5 | Step 91/140
+Epoch 4/5 | Step 92/140
+Epoch 4/5 | Step 93/140
+Epoch 4/5 | Step 94/140
+Epoch 4/5 | Step 95/140
+Epoch 4/5 | Step 96/140
+Epoch 4/5 | Step 97/140
+Epoch 4/5 | Step 98/140
+Epoch 4/5 | Step 99/140
+Epoch 4/5 | Step 100/140
+  Saved: checkpoint-step-100
+Epoch 4/5 | Step 101/140
+Epoch 4/5 | Step 102/140
+Epoch 4/5 | Step 103/140
+Epoch 4/5 | Step 104/140
+Epoch 4/5 | Step 105/140
+Epoch 4/5 | Step 106/140
+Epoch 4/5 | Step 107/140
+Epoch 4/5 | Step 108/140
+Epoch 4/5 | Step 109/140
+Epoch 4/5 | Step 110/140
+  Saved: checkpoint-step-110
+Epoch 4/5 | Step 111/140
+Epoch 4/5 | Step 112/140
+Epoch 4 complete.
+Epoch 5/5 | Step 113/140
+Epoch 5/5 | Step 114/140
+Epoch 5/5 | Step 115/140
+Epoch 5/5 | Step 116/140
+Epoch 5/5 | Step 117/140
+Epoch 5/5 | Step 118/140
+Epoch 5/5 | Step 119/140
+Epoch 5/5 | Step 120/140
+  Saved: checkpoint-step-120
+Epoch 5/5 | Step 121/140
+Epoch 5/5 | Step 122/140
+Epoch 5/5 | Step 123/140
+Epoch 5/5 | Step 124/140
+Epoch 5/5 | Step 125/140
+Epoch 5/5 | Step 126/140
+Epoch 5/5 | Step 127/140
+Epoch 5/5 | Step 128/140
+Epoch 5/5 | Step 129/140
+Epoch 5/5 | Step 130/140
+  Saved: checkpoint-step-130
+Epoch 5/5 | Step 131/140
+Epoch 5/5 | Step 132/140
+Epoch 5/5 | Step 133/140
+Epoch 5/5 | Step 134/140
+Epoch 5/5 | Step 135/140
+Epoch 5/5 | Step 136/140
+Epoch 5/5 | Step 137/140
+Epoch 5/5 | Step 138/140
+Epoch 5/5 | Step 139/140
+Epoch 5/5 | Step 140/140
+  Saved: checkpoint-step-140
+Epoch 5 complete.
+Saving final weights...
+Weights saved.
+
+==================================================
+FINE-TUNED EVAL
+==================================================
+Running Fine-tuned eval on 56 examples (16 parallel)...
+Fine-tuned Accuracy: 42/56 = 75.0%
+  interferes             14/21 = 66.7%
+  safe                   28/35 = 80.0%
+
+==================================================
+RESULTS SUMMARY
+==================================================
+  Baseline accuracy:   5.4%
+  Fine-tuned accuracy: 75.0%
+  Improvement:         +69.6%
+==================================================
