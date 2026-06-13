@@ -8,7 +8,7 @@ import tinker
 from tinker import types
 
 MODEL_ID      = "openai/gpt-oss-120b"
-DATA_PATH = "compiler_passes_small.jsonl"
+DATA_PATH = "compiler_passes.jsonl"
 LORA_RANK     = 16
 LEARNING_RATE = 2e-4
 NUM_EPOCHS    = 5
