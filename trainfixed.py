@@ -54,6 +54,7 @@ def make_datum(ex, tokenizer):
     return types.Datum(
         model_input=types.ModelInput.from_ints(tokens=ft),
         loss_fn_inputs=dict(
+            
             target_tokens=ft[1:] + [eos],
             weights=[0.0]*len(pt) + [1.0]*len(ct),
         )
