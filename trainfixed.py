@@ -25,11 +25,21 @@ def load_jsonl(path):
 
 
 def split_data(examples, ratio, seed):
+    groups = {}
+    for ex in examples:
+        key = frozenset((ex["pass_a"], ex["pass_b"]))
+        groups.setdefault(key, []).append(ex)
+
+    keys = list(groups.keys())
     random.seed(seed)
-    s = examples[:]
-    random.shuffle(s)
-    n = int(len(s) * ratio)
-    return s[:n], s[n:]
+    random.shuffle(keys)
+
+    n = int(len(keys) * ratio)
+    train_keys, test_keys = keys[:n], keys[n:]
+
+    train = [ex for k in train_keys for ex in groups[k]]
+    test = [ex for k in test_keys for ex in groups[k]]
+    return train, test
 
 
 def format_prompt(ex):
