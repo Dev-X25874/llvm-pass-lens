@@ -2,7 +2,7 @@
 
 Fine-tuning a 120B LLM to classify LLVM compiler pass interactions using real `opt`-verified ground truth.
 
-**Result: 5.4% baseline → 75.0% fine-tuned → +69.6% improvement**
+**Result: 1.7% baseline → 72.9% fine-tuned → +71.2% improvement**
 
 Blog post: https://sayakmondal1.substack.com/p/how-i-fine-tuned-a-120b-parameter
 
@@ -32,26 +32,28 @@ Every label is derived by actually running `opt` twice and comparing normalized 
 
 ## Setup
 
-pip install -r requirements.txt
-export TINKER_API_KEY="your_key_here"
+To train (no LLVM needed — training only reads the pre-generated dataset):
 
-LLVM 18+ must be installed (/usr/bin/opt).
+    pip install -r requirements.txt
+    export TINKER_API_KEY="your_key_here"
+    python3 trainfixed.py
+
+To regenerate the dataset from scratch (requires LLVM 18+ / `opt` on PATH):
+
+    python3 ground_truth_gen.py --count 200
+
+Generates 100 safe + 100 interferes examples verified by `opt`.
 
 ---
 
-## Generate dataset
+## Train/test split methodology
 
-python3 ground_truth_gen.py --count 200
-
-Generates 100 safe + 100 interferes examples verified by opt.
-
----
-
-## Train
-
-python3 trainfixed.py
-
-Trains openai/gpt-oss-120b with LoRA rank 16 for 5 epochs. Prints baseline vs fine-tuned accuracy at the end.
+The split is grouped by unordered pass-pair, not by row. Commutativity is
+symmetric — `(pass_a, pass_b)` and `(pass_b, pass_a)` always carry the same
+label — so a naive row-level shuffle lets mirrored examples leak across the
+train/test boundary, letting the model memorize a pair instead of generalizing.
+`split_data()` groups on `frozenset({pass_a, pass_b})` before splitting, so
+every mirrored pair stays entirely on one side.
 
 ---
 
@@ -59,10 +61,21 @@ Trains openai/gpt-oss-120b with LoRA rank 16 for 5 epochs. Prints baseline vs fi
 
 | | Accuracy |
 |---|---|
-| Baseline | 5.4% |
-| Fine-tuned | 75.0% |
-| Improvement | +69.6% |
+| Baseline | 1.7% |
+| Fine-tuned | 72.9% |
+| Improvement | +71.2% |
+
+**Per-class breakdown (fine-tuned):**
+
+| Label | Accuracy |
+|---|---|
+| interferes | 26/28 = 92.9% |
+| safe | 17/31 = 54.8% |
+
+The model is substantially stronger at detecting `interferes` than confirming
+`safe` — current weak point, and the next thing to improve.
 
 ---
 
-Built in GitHub Codespaces. LLVM 18.1.3. TML Tinker SDK 0.22.3.
+Built in GitHub Codespaces (dataset generation) + native Windows (training).
+LLVM 18.1.3. TML Tinker SDK 0.22.3.
