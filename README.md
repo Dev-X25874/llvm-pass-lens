@@ -2,80 +2,91 @@
 
 Fine-tuning a 120B LLM to classify LLVM compiler pass interactions using real `opt`-verified ground truth.
 
-**Result: 1.7% baseline → 72.9% fine-tuned → +71.2% improvement**
+## ⚠️ Known issues (found and fixed during review)
+
+- **Fixed:** the original `results_comparison.txt` and `baseline_predictions.jsonl`
+  contained hardcoded placeholder text ("always guesses safe"), not real model
+  output — no code in this repo ever generated those files. The previously
+  reported +71.2% improvement was not a real measurement. Both files have
+  been removed.
+- **Fixed:** `extract_label()` used naive substring matching, so "unsafe" was
+  misread as "safe", and "interfere" (without a trailing s) wasn't recognized
+  at all. Both are now handled correctly with word-boundary regex.
+- **Fixed:** the original 80-token eval budget was far too small for
+  `gpt-oss-120b`, a reasoning model that writes an internal "analysis" pass
+  before its final answer — nearly all baseline responses were getting cut
+  off mid-thought. Raised to 1000 tokens so responses actually complete.
+- **Fixed:** the baseline eval prompt never told the model what label
+  vocabulary to use ("safe"/"interferes"), so it reasonably answered with its
+  own wording ("No Interaction", "Independent", etc.) and was graded as wrong
+  regardless of correct reasoning. The prompt now states the required labels
+  explicitly.
+- **Fixed:** train/test split originally grouped by pass-pair only, but this
+  dataset reuses only ~20 unique IR snippets across many pass-pairs, so the
+  same IR code could appear in both train and test. Split now groups by IR
+  snippet to guarantee zero code-level leakage.
+- **Fixed:** 98 of the original 280 examples (35%) belonged to pass-pairs with
+  contradictory labels (e.g. the same pair labeled both `safe` and
+  `interferes` across duplicate rows). These were removed
+  (`filter_dataset.py` → `compiler_passes_clean.jsonl`, 182 examples
+  remaining); they still need re-verification via `ground_truth_gen.py`
+  before being reintroduced.
+- **Known limitation:** the cleaned dataset's class balance shifted to
+  `safe: 110, interferes: 72` (not the original even 140/140), and the held-out
+  test set is only 39 examples — a real, verified number, but based on a
+  small sample, so treat it as an estimate rather than a precise figure.
+
+## Result (real, verified end-to-end run)
+
+**53.8% baseline → 82.1% fine-tuned → +28.2% improvement**
+
+(measured on a 39-example, leakage-free, contradiction-free held-out test set)
+
+| Label | Fine-tuned accuracy |
+|---|---|
+| interferes | 9/10 = 90.0% |
+| safe | 23/29 = 79.3% |
+
+Baseline accuracy is measured with the base model told the correct label
+vocabulary and given enough tokens to finish its reasoning before answering
+— earlier baseline numbers in this repo's history were measured unfairly
+(unstated vocabulary, insufficient token budget) and are not representative.
 
 Blog post: https://sayakmondal1.substack.com/p/how-i-fine-tuned-a-120b-parameter
+(numbers in the linked post reflect an earlier, since-corrected run — see
+Known issues above)
 
 ---
 
 ## What it does
 
 Given two LLVM passes and an IR snippet, the model classifies their interaction as:
+
 - `safe` — pass order does not affect the output (AB == BA)
 - `interferes` — pass order changes the output (AB != BA)
 
-Every label is derived by actually running `opt` twice and comparing normalized outputs. No LLM-generated labels.
-
----
-
 ## Files
 
-| File | What it does |
-|---|---|
-| `ground_truth_gen.py` | Generates dataset by running real `opt` — zero hallucination |
-| `trainfixed.py` | LoRA fine-tuning pipeline via TML Tinker SDK |
-| `compiler_passes.jsonl` | 280 verified training examples (140 safe / 140 interferes) |
-| `baseline_predictions.jsonl` | Baseline vs fine-tuned predictions on test set |
-| `requirements.txt` | Python dependencies |
-
----
+- `trainfixed.py` — training + eval script (fixed, see Known issues)
+- `check_dataset.py` — reports contradictory-label pass-pairs, does not auto-fix
+- `filter_dataset.py` — removes contradictory-label rows, writes `compiler_passes_clean.jsonl`
+- `compiler_passes.jsonl` — original dataset (280 examples, contains known label
+  inconsistencies — see Known issues)
+- `compiler_passes_clean.jsonl` — cleaned dataset used for the real training run (182 examples)
+- `contradictory_label_rows.jsonl` — the 98 rows removed, pending re-verification
+- `ground_truth_gen.py` — generates ground truth labels via real `opt` runs (requires LLVM 18+)
+- `baseline_raw_outputs.jsonl` / `fine-tuned_raw_outputs.jsonl` — raw model
+  text for every test example, for manual spot-checking instead of trusting
+  the parser blindly
 
 ## Setup
 
-To train (no LLVM needed — training only reads the pre-generated dataset):
+```bash
+pip install -r requirements.txt
+export TINKER_API_KEY="your_key_here"
+python trainfixed.py
+```
 
-    pip install -r requirements.txt
-    export TINKER_API_KEY="your_key_here"
-    python3 trainfixed.py
-
-To regenerate the dataset from scratch (requires LLVM 18+ / `opt` on PATH):
-
-    python3 ground_truth_gen.py --count 200
-
-Generates 100 safe + 100 interferes examples verified by `opt`.
-
----
-
-## Train/test split methodology
-
-The split is grouped by unordered pass-pair, not by row. Commutativity is
-symmetric — `(pass_a, pass_b)` and `(pass_b, pass_a)` always carry the same
-label — so a naive row-level shuffle lets mirrored examples leak across the
-train/test boundary, letting the model memorize a pair instead of generalizing.
-`split_data()` groups on `frozenset({pass_a, pass_b})` before splitting, so
-every mirrored pair stays entirely on one side.
-
----
-
-## Results
-
-| | Accuracy |
-|---|---|
-| Baseline | 1.7% |
-| Fine-tuned | 72.9% |
-| Improvement | +71.2% |
-
-**Per-class breakdown (fine-tuned):**
-
-| Label | Accuracy |
-|---|---|
-| interferes | 26/28 = 92.9% |
-| safe | 17/31 = 54.8% |
-
-The model is substantially stronger at detecting `interferes` than confirming
-`safe` — current weak point, and the next thing to improve.
-
----
-
-Built in GitHub Codespaces (dataset generation) + native Windows (training).
-LLVM 18.1.3. TML Tinker SDK 0.22.3.
+Requires an LLVM 18+ `opt` on PATH only if regenerating the dataset via
+`ground_truth_gen.py` — training itself only reads the pre-generated
+`compiler_passes_clean.jsonl`.
