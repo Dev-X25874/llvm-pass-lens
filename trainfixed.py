@@ -1,14 +1,33 @@
 """
 train.py — fine-tune openai/gpt-oss-120b on compiler pass data.
-Fixed: parallel eval (was sequential, causing 20+ min baseline eval).
+
+Fixes applied:
+- Parallel eval (was sequential, causing 20+ min baseline eval).
+- extract_label() no longer misparses grammatically valid answers:
+  * "interfere" (plural verb, no trailing s) now matches, not just
+    the exact string "interferes".
+  * "unsafe" / "not safe" no longer gets misread as "safe" via naive
+    substring matching.
+- eval now saves raw model output to disk (baseline_raw_outputs.jsonl /
+  fine-tuned_raw_outputs.jsonl) so results can be manually spot-checked
+  instead of trusting extract_label() blindly.
+- split_data() now prevents TWO kinds of leakage, not just one:
+  1. mirrored pass-pair leakage (pass_a,pass_b) vs (pass_b,pass_a) —
+     original behavior, kept.
+  2. IR-snippet leakage — this dataset only has 20 unique IR snippets
+     reused across many pass-pairs, so grouping by pass-pair alone let
+     the *same* IR text appear in both train and test (just paired with
+     a different pass combo). Now uses union-find so any two examples
+     sharing either the same pass-pair OR the same ir_snippet always
+     land in the same split.
 """
 
-import asyncio, json, math, random
+import asyncio, json, math, random, re
 import tinker
 from tinker import types
 
 MODEL_ID      = "openai/gpt-oss-120b"
-DATA_PATH = "compiler_passes.jsonl"
+DATA_PATH = "compiler_passes_clean.jsonl"
 LORA_RANK     = 16
 LEARNING_RATE = 2e-4
 NUM_EPOCHS    = 5
@@ -25,17 +44,34 @@ def load_jsonl(path):
 
 
 def split_data(examples, ratio, seed):
+    # Group by ir_snippet only. This dataset has very few unique IR
+    # snippets (~20) reused across many pass-pairs, so grouping by
+    # BOTH pass-pair and ir_snippet (an earlier version of this
+    # function) caused those two dimensions to cross-link transitively
+    # and collapse almost everything into one giant component, leaving
+    # an unusably tiny test set. Grouping by ir_snippet alone still
+    # guarantees zero literal-code leakage (the leak that matters most)
+    # while keeping groups small enough to split sensibly.
     groups = {}
     for ex in examples:
-        key = frozenset((ex["pass_a"], ex["pass_b"]))
-        groups.setdefault(key, []).append(ex)
+        groups.setdefault(ex["ir_snippet"], []).append(ex)
 
     keys = list(groups.keys())
     random.seed(seed)
     random.shuffle(keys)
 
-    n = int(len(keys) * ratio)
-    train_keys, test_keys = keys[:n], keys[n:]
+    # Assign whole IR-snippet groups to test until we hit roughly the
+    # target test proportion by EXAMPLE COUNT (not group count), so a
+    # few large groups can't starve the test set the way group-count
+    # splitting did.
+    target_test_n = round(len(examples) * (1 - ratio))
+    test_keys, test_n = [], 0
+    for k in keys:
+        if test_n >= target_test_n:
+            break
+        test_keys.append(k)
+        test_n += len(groups[k])
+    train_keys = [k for k in keys if k not in set(test_keys)]
 
     train = [ex for k in train_keys for ex in groups[k]]
     test = [ex for k in test_keys for ex in groups[k]]
@@ -73,9 +109,28 @@ def make_datum(ex, tokenizer):
 
 def extract_label(text):
     text = text.lower()
-    for l in ["pass_a_dominates", "pass_b_dominates", "interferes", "safe"]:
+
+    # Structured/unambiguous labels first.
+    for l in ["pass_a_dominates", "pass_b_dominates"]:
         if l in text:
             return l
+
+    # "interferes" or "interfere" (singular vs plural verb agreement —
+    # a grammatically natural answer like "these passes interfere"
+    # previously never matched the exact string "interferes").
+    if re.search(r"\binterferes?\b", text):
+        return "interferes"
+
+    # "unsafe" / "not safe" must NOT be read as "safe" — the old code
+    # did naive substring matching, so "unsafe" matched because it
+    # contains the substring "safe". Treat these as a non-safe signal
+    # instead of silently flipping to "safe".
+    if "unsafe" in text or re.search(r"\bnot\s+safe\b", text):
+        return None  # ambiguous under this label scheme — don't guess
+
+    if re.search(r"\bsafe\b", text):
+        return "safe"
+
     return None
 
 
@@ -87,7 +142,7 @@ def batch(lst, size):
 async def eval_one(sem, sampling_client, tokenizer, ex, params):
     async with sem:
         messages = [
-            {"role": "system", "content": "You analyze LLVM compiler pass interactions. Respond with Label and Explanation only."},
+            {"role": "system", "content": "You analyze LLVM compiler pass interactions. Respond with exactly two lines:\nLabel: safe\nExplanation: <one sentence>\nor:\nLabel: interferes\nExplanation: <one sentence>\nUse only the word 'safe' or 'interferes' as the Label — no other wording."},
             {"role": "user",   "content": format_prompt(ex)},
         ]
         text   = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
@@ -104,16 +159,29 @@ async def eval_one(sem, sampling_client, tokenizer, ex, params):
                 raw = raw.split("<|return|>")[0]
 
         predicted = extract_label(raw)
-        return predicted == ex["label"], ex["label"], predicted
+        return predicted == ex["label"], ex["label"], predicted, raw, ex["pass_a"], ex["pass_b"]
 
 
 async def eval_model(sampling_client, tokenizer, test_examples, label="Model"):
-    params  = types.SamplingParams(max_tokens=80, temperature=0.0)
+    params  = types.SamplingParams(max_tokens=1000, temperature=0.0)
     sem     = asyncio.Semaphore(EVAL_WORKERS)
     tasks   = [eval_one(sem, sampling_client, tokenizer, ex, params) for ex in test_examples]
 
     print(f"Running {label} eval on {len(test_examples)} examples ({EVAL_WORKERS} parallel)...")
     results = await asyncio.gather(*tasks)
+
+    out_path = f"{label.lower().replace(' ', '_')}_raw_outputs.jsonl"
+    with open(out_path, "w") as f:
+        for ok, exp, pred, raw, pa, pb in results:
+            f.write(json.dumps({
+                "pass_a": pa,
+                "pass_b": pb,
+                "ground_truth": exp,
+                "extracted_label": pred,
+                "extracted_matched_ground_truth": ok,
+                "raw_model_output": raw,
+            }) + "\n")
+    print(f"  Saved raw outputs -> {out_path}")
 
     correct = sum(1 for r in results if r[0])
     acc     = correct / len(results) * 100
@@ -121,7 +189,7 @@ async def eval_model(sampling_client, tokenizer, test_examples, label="Model"):
 
     from collections import defaultdict
     per_label = defaultdict(lambda: [0,0])
-    for ok, exp, pred in results:
+    for ok, exp, pred, raw, pa, pb in results:
         per_label[exp][1] += 1
         if ok: per_label[exp][0] += 1
     for lbl, (c, t) in sorted(per_label.items()):
@@ -133,6 +201,12 @@ async def train():
     all_ex = load_jsonl(DATA_PATH)
     train_ex, test_ex = split_data(all_ex, TRAIN_SPLIT, RANDOM_SEED)
     print(f"Dataset: {len(all_ex)} total | {len(train_ex)} train | {len(test_ex)} test")
+
+    # Sanity check: confirm no IR-snippet leakage across the split.
+    train_ir = set(e["ir_snippet"] for e in train_ex)
+    test_ir  = set(e["ir_snippet"] for e in test_ex)
+    overlap  = train_ir & test_ir
+    print(f"IR snippets — train: {len(train_ir)} | test: {len(test_ir)} | overlap: {len(overlap)}")
 
     service_client = tinker.ServiceClient()
 

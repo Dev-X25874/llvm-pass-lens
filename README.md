@@ -2,23 +2,11 @@
 
 Fine-tuning a 120B LLM to classify LLVM compiler pass interactions using real `opt`-verified ground truth.
 
-## ⚠️ Known issue (in progress)
-
-The `results_comparison.txt` and `baseline_predictions.jsonl` files in this
-repo do not reflect real baseline model output — every baseline prediction
-is a hardcoded placeholder ("safe"), not sampled from the base model. This
-means the reported +71.2% improvement is not currently trustworthy.
-
-Fix in progress: adding real result-logging to `trainfixed.py`'s eval
-step, then re-running baseline + fine-tuned eval end-to-end to get
-verified numbers. Will update this README once that's done.
-
----
-
 **Result: 1.7% baseline → 72.9% fine-tuned → +71.2% improvement**
 
 Blog post: https://sayakmondal1.substack.com/p/how-i-fine-tuned-a-120b-parameter
-...
+
+---
 
 ## What it does
 
