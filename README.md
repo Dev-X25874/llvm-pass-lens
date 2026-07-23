@@ -52,10 +52,6 @@ vocabulary and given enough tokens to finish its reasoning before answering
 — earlier baseline numbers in this repo's history were measured unfairly
 (unstated vocabulary, insufficient token budget) and are not representative.
 
-Blog post: https://sayakmondal1.substack.com/p/how-i-fine-tuned-a-120b-parameter
-(numbers in the linked post reflect an earlier, since-corrected run — see
-Known issues above)
-
 ---
 
 ## What it does
