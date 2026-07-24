@@ -42,6 +42,8 @@ Fine-tuning a 120B LLM to classify LLVM compiler pass interactions using real `o
 
 (measured on a 39-example, leakage-free, contradiction-free held-out test set)
 
+Blog post (postmortem): https://sayakmondal1.substack.com/p/i-fine-tuned-a-120b-model-on-compiler
+
 | Label | Fine-tuned accuracy |
 |---|---|
 | interferes | 9/10 = 90.0% |
